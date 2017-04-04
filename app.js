@@ -1,5 +1,7 @@
+var itemsPerPage = 20;
 if (!process.env.PORT)
   process.env.PORT = 8080;
+  
 
 /* initialization of Chinook database */
 var sqlite3 = require('sqlite3').verbose();
@@ -9,7 +11,7 @@ var db = new sqlite3.Database('chinook.sl3');
 var artists = function(page, artist, details, callback) {
   db.all("SELECT Artist.ArtistId, Name, StarsNo " +
     "FROM Artist, Stars WHERE Artist.ArtistId = Stars.ArtistId " +
-    "ORDER BY Name LIMIT 33 OFFSET ($page - 1) * 33",
+    "ORDER BY Name LIMIT "+itemsPerPage+" OFFSET ($page - 1) * "+itemsPerPage,
     {$page: page}, function(error, rows) {
       if (error) {
         console.log(error);
@@ -18,7 +20,7 @@ var artists = function(page, artist, details, callback) {
         var result = '<div id="artists">';
         for (var i = 0; i < rows.length; i++) {
           var selected = rows[i].ArtistId == artist;
-          result += '<div id="' + rows[i].ArtistId + '"><span class="numbers">' + (page * 33 + i - 32) + '.</span>' +
+          result += '<div id="' + rows[i].ArtistId + '"><span class="numbers">' + (page * itemsPerPage + i - (itemsPerPage-1)) + '.</span>' +
             '<a href="/artists/' + page + (!selected? '/details/' + rows[i].ArtistId: '') + '#' + rows[i].ArtistId + '">' +
             '<button type="button" class="btn btn-default' + (selected? ' selected': '') + '">' +
             rows[i].Name + '</button></a><span class="stars">';
@@ -93,10 +95,15 @@ var genres = function(artist, callback) {
         console.log(error);
         callback('<strong>Something went wrong!</strong>');
       } else {
-        var result = '<h5>Genres</h5><div id="genres">' + 
-          'No genres for this artist' + 
-          '</div>';
-        callback(result);
+        var result = '<h5>Genres</h5><div id="genres">'; 
+        if (rows.length == 0)
+          result += 'This artist is on no genres';
+        else
+          for(var i = 0; i < rows.length; i++) {
+            result += rows[i].Name + ((i<rows.length-1) ? " | " :"")
+          }
+          
+        callback(result + '</div>');
       }
   });
 }
@@ -119,6 +126,14 @@ app.get('/artists/:page', function(request, response) {
   artists(request.params.page, -1, '', function(result) {
     response.render('index', {content: result});
   });
+});
+
+app.get('/', function(zahteva, odgovor) {
+  odgovor.redirect('/artists/1');
+});
+
+app.listen(process.env.PORT, function(){
+  console.log('Strežnik je pognan!');
 });
 
 /* responds with specified page's artists and artist's details */
@@ -187,7 +202,7 @@ app.get('/pages', function(request, response) {
       console.log(error);
       response.sendStatus(500);
     } else
-      response.send({pages: Math.ceil(row.Artists / 33)});
+      response.send({pages: Math.ceil(row.Artists / itemsPerPage)});
   });
 });
 
